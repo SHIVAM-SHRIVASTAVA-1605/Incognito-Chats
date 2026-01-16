@@ -15,8 +15,17 @@ class StorageService {
     Hive.registerAdapter(ConversationModelAdapter());
     Hive.registerAdapter(MessageModelAdapter());
     
-    await Hive.openBox<ConversationModel>(conversationsBox);
-    await Hive.openBox<MessageModel>(messagesBox);
+    try {
+      await Hive.openBox<ConversationModel>(conversationsBox);
+      await Hive.openBox<MessageModel>(messagesBox);
+    } catch (e) {
+      // If opening boxes fails (schema mismatch), delete and recreate them
+      print('Error opening Hive boxes, clearing corrupted data: $e');
+      await Hive.deleteBoxFromDisk(conversationsBox);
+      await Hive.deleteBoxFromDisk(messagesBox);
+      await Hive.openBox<ConversationModel>(conversationsBox);
+      await Hive.openBox<MessageModel>(messagesBox);
+    }
   }
 
   // Conversations

@@ -90,15 +90,23 @@ class SocketHandler {
             return socket.emit('error', { message: 'Conversation not found' });
           }
 
+          // Calculate expiry time
+          const expiryHours = parseInt(process.env.MESSAGE_EXPIRY_HOURS) || 12;
+          const expiresAt = new Date(Date.now() + expiryHours * 60 * 60 * 1000);
+
           // Create message
           const message = await Message.create({
             conversationId,
             senderId: socket.userId,
-            content: content.trim()
+            content: content.trim(),
+            expiresAt
           });
 
-          // Update conversation's lastMessageAt
+          // Update conversation's lastMessageAt and lastMessagePreview
           conversation.lastMessageAt = new Date();
+          conversation.lastMessagePreview = content.trim().length > 50
+            ? content.trim().substring(0, 50) + '...'
+            : content.trim();
           await conversation.save();
 
           // Get sender info

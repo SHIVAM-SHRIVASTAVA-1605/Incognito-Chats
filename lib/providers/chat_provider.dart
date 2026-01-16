@@ -37,11 +37,22 @@ class ChatProvider extends ChangeNotifier {
 
   void _setupSocketListeners() {
     _socketService.onNewMessage = (message) {
-      // Add message to list if it's for current conversation
-      if (message.conversationId == _currentConversationId) {
+      // Check if this is a confirmation for our own pending message
+      final pendingIndex = _messages.indexWhere((m) => 
+        m.senderId == _authService.currentUser?.id && 
+        m.status == 'pending' &&
+        m.content == message.content
+      );
+      
+      if (pendingIndex != -1) {
+        // Update the pending message with the server response
+        _messages[pendingIndex] = message;
+      } else if (message.conversationId == _currentConversationId) {
+        // Add new message from other user
         _messages.add(message);
-        notifyListeners();
       }
+      
+      notifyListeners();
       
       // Save to storage
       _storageService.saveMessage(message);
@@ -143,6 +154,22 @@ class ChatProvider extends ChangeNotifier {
 
   void sendMessage(String content) {
     if (_currentConversationId != null && content.trim().isNotEmpty) {
+      // Create a temporary pending message
+      final tempMessage = MessageModel(
+        id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+        conversationId: _currentConversationId!,
+        senderId: _authService.currentUser?.id ?? '',
+        content: content.trim(),
+        createdAt: DateTime.now(),
+        expiresAt: DateTime.now().add(const Duration(hours: 12)),
+        status: 'pending',
+      );
+      
+      // Add to UI immediately
+      _messages.add(tempMessage);
+      notifyListeners();
+      
+      // Send to server
       _socketService.sendMessage(_currentConversationId!, content.trim());
     }
   }

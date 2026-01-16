@@ -26,6 +26,9 @@ class MessageModel extends HiveObject {
   @HiveField(6)
   UserModel? sender;
 
+  @HiveField(7)
+  String status; // 'pending', 'sent', 'delivered'
+
   MessageModel({
     required this.id,
     required this.conversationId,
@@ -34,6 +37,7 @@ class MessageModel extends HiveObject {
     required this.createdAt,
     required this.expiresAt,
     this.sender,
+    this.status = 'pending',
   });
 
   bool get isExpired => DateTime.now().isAfter(expiresAt);
@@ -49,6 +53,7 @@ class MessageModel extends HiveObject {
       sender: json['sender'] != null
           ? UserModel.fromJson(json['sender'] as Map<String, dynamic>)
           : null,
+      status: json['status'] as String? ?? 'sent',
     );
   }
 
@@ -61,6 +66,7 @@ class MessageModel extends HiveObject {
       'createdAt': createdAt.toIso8601String(),
       'expiresAt': expiresAt.toIso8601String(),
       'sender': sender?.toJson(),
+      'status': status,
     };
   }
 }
