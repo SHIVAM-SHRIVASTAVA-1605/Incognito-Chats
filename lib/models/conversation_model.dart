@@ -28,7 +28,7 @@ class ConversationModel extends HiveObject {
     return ConversationModel(
       id: json['id'] as String,
       otherUser: UserModel.fromJson(json['otherUser'] as Map<String, dynamic>),
-      lastMessageAt: DateTime.parse(json['lastMessageAt'] as String),
+      lastMessageAt: DateTime.parse(json['lastMessageAt'] as String).toLocal(),
       lastMessagePreview: json['lastMessagePreview'] as String?,
     );
   }

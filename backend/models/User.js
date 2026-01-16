@@ -22,7 +22,14 @@ const User = sequelize.define('User', {
   },
   displayName: {
     type: DataTypes.STRING,
-    allowNull: true
+    allowNull: true,
+    unique: true,
+    validate: {
+      len: {
+        args: [3, 50],
+        msg: 'Display name must be between 3 and 50 characters'
+      }
+    }
   },
   bio: {
     type: DataTypes.TEXT,

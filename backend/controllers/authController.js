@@ -2,11 +2,29 @@ const jwt = require('jsonwebtoken');
 const { User } = require('../models');
 
 // Anonymous name generator
-const generateAnonymousName = () => {
+const generateAnonymousName = async () => {
   const adjectives = ['Silent', 'Shadow', 'Mystic', 'Phantom', 'Ghost', 'Cipher', 'Enigma', 'Anonymous', 'Hidden', 'Stealth'];
   const nouns = ['Wolf', 'Raven', 'Fox', 'Owl', 'Hawk', 'Panther', 'Tiger', 'Eagle', 'Bear', 'Lion'];
-  const number = Math.floor(Math.random() * 9999);
-  return `${adjectives[Math.floor(Math.random() * adjectives.length)]}${nouns[Math.floor(Math.random() * nouns.length)]}${number}`;
+  
+  let displayName;
+  let attempts = 0;
+  const maxAttempts = 10;
+  
+  // Try to generate a unique name
+  while (attempts < maxAttempts) {
+    const number = Math.floor(Math.random() * 9999);
+    displayName = `${adjectives[Math.floor(Math.random() * adjectives.length)]}${nouns[Math.floor(Math.random() * nouns.length)]}${number}`;
+    
+    // Check if name already exists
+    const existing = await User.findOne({ where: { displayName } });
+    if (!existing) {
+      return displayName;
+    }
+    attempts++;
+  }
+  
+  // If still not unique, append timestamp
+  return `Anonymous${Date.now()}`;
 };
 
 // Register
@@ -32,7 +50,7 @@ exports.register = async (req, res) => {
     const user = await User.create({
       email,
       passwordHash: password,
-      displayName: generateAnonymousName()
+      displayName: await generateAnonymousName()
     });
 
     // Generate token

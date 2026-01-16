@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/conversation_model.dart';
@@ -19,6 +20,14 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  Timer? _expiryCheckTimer;
+  late ChatProvider _chatProvider;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _chatProvider = context.read<ChatProvider>();
+  }
 
   @override
   void initState() {
@@ -26,13 +35,21 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ChatProvider>().loadMessages(widget.conversation.id);
     });
+    
+    // Check for expired messages every 5 seconds
+    _expiryCheckTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) {
+        context.read<ChatProvider>().removeExpiredMessages();
+      }
+    });
   }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
-    context.read<ChatProvider>().leaveConversation();
+    _expiryCheckTimer?.cancel();
+    _chatProvider.leaveConversation();
     super.dispose();
   }
 
@@ -140,7 +157,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final messages = chatProvider.messages;
+                // Filter out expired messages
+                final messages = chatProvider.messages
+                    .where((m) => !m.isExpired)
+                    .toList();
 
                 if (messages.isEmpty) {
                   return Center(

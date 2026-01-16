@@ -48,8 +48,8 @@ class MessageModel extends HiveObject {
       conversationId: json['conversationId'] as String,
       senderId: json['senderId'] as String,
       content: json['content'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      expiresAt: DateTime.parse(json['expiresAt'] as String),
+      createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
+      expiresAt: DateTime.parse(json['expiresAt'] as String).toLocal(),
       sender: json['sender'] != null
           ? UserModel.fromJson(json['sender'] as Map<String, dynamic>)
           : null,

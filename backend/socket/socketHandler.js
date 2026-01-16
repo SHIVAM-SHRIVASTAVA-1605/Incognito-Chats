@@ -91,7 +91,7 @@ class SocketHandler {
           }
 
           // Calculate expiry time
-          const expiryHours = parseInt(process.env.MESSAGE_EXPIRY_HOURS) || 12;
+          const expiryHours = parseFloat(process.env.MESSAGE_EXPIRY_HOURS) || 12;
           const expiresAt = new Date(Date.now() + expiryHours * 60 * 60 * 1000);
 
           // Create message

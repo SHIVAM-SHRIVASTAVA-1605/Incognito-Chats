@@ -180,6 +180,21 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  void removeExpiredMessages() {
+    final initialCount = _messages.length;
+    _messages.removeWhere((m) => m.isExpired);
+    
+    // Only notify if messages were actually removed
+    if (_messages.length != initialCount) {
+      notifyListeners();
+      
+      // Also delete from storage
+      for (var message in _messages.where((m) => m.isExpired)) {
+        _storageService.deleteMessage(message.id);
+      }
+    }
+  }
+
   Future<void> deleteConversation(String conversationId) async {
     final result = await _chatService.deleteConversation(conversationId);
     

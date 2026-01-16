@@ -53,7 +53,23 @@ exports.updateProfile = async (req, res) => {
     const user = await User.findByPk(req.user.id);
 
     if (displayName !== undefined) {
-      user.displayName = displayName;
+      // Validate display name length
+      if (displayName.trim().length < 3) {
+        return res.status(400).json({ error: 'Display name must be at least 3 characters' });
+      }
+      if (displayName.trim().length > 50) {
+        return res.status(400).json({ error: 'Display name must be less than 50 characters' });
+      }
+      
+      // Check if display name is already taken by another user
+      if (displayName !== user.displayName) {
+        const existingUser = await User.findOne({ where: { displayName: displayName.trim() } });
+        if (existingUser) {
+          return res.status(400).json({ error: 'Display name is already taken' });
+        }
+      }
+      
+      user.displayName = displayName.trim();
     }
     if (bio !== undefined) {
       user.bio = bio;
@@ -71,6 +87,9 @@ exports.updateProfile = async (req, res) => {
     });
   } catch (error) {
     console.error('Update profile error:', error);
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ error: 'Display name is already taken' });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };

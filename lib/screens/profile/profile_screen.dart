@@ -42,9 +42,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (result['success'] && mounted) {
+      // Update the current user in AuthService
+      await appProvider.authService.updateCurrentUser(result['user']);
+      
       setState(() {
         _isEditing = false;
       });
+      
+      // Notify listeners to refresh UI
+      appProvider.notifyListeners();
+      
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile updated successfully')),
       );
@@ -144,10 +151,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Display Name',
                   prefixIcon: Icon(Icons.person_outline),
+                  helperText: 'Minimum 3 characters',
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Display name is required';
+                  }
+                  if (value.trim().length < 3) {
+                    return 'Display name must be at least 3 characters';
+                  }
+                  if (value.trim().length > 50) {
+                    return 'Display name must be less than 50 characters';
                   }
                   return null;
                 },

@@ -50,7 +50,7 @@ const Message = sequelize.define('Message', {
 
 // Set expiry time before creating message
 Message.beforeCreate((message) => {
-  const expiryHours = parseInt(process.env.MESSAGE_EXPIRY_HOURS) || 12;
+  const expiryHours = parseFloat(process.env.MESSAGE_EXPIRY_HOURS) || 12;
   message.expiresAt = new Date(Date.now() + expiryHours * 60 * 60 * 1000);
 });
 

@@ -4,8 +4,8 @@ const { Op } = require('sequelize');
 
 class MessageCleanup {
   static startCleanupJob() {
-    // Run cleanup every hour
-    cron.schedule('0 * * * *', async () => {
+    // Run cleanup every minute (for testing, change to '0 * * * *' for hourly in production)
+    cron.schedule('* * * * *', async () => {
       try {
         console.log('Starting message cleanup job...');
         
@@ -23,7 +23,7 @@ class MessageCleanup {
       }
     });
 
-    console.log('Message cleanup job scheduled (runs every hour)');
+    console.log('Message cleanup job scheduled (runs every minute for testing)');
   }
 }
 
