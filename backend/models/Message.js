@@ -27,8 +27,17 @@ const Message = sequelize.define('Message', {
     type: DataTypes.TEXT,
     allowNull: false
   },
+  replyToId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    references: {
+      model: 'messages',
+      key: 'id'
+    }
+  },
   reactions: {
     type: DataTypes.JSONB,
+    allowNull: false,
     defaultValue: {}
   },
   createdAt: {

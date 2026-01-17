@@ -151,7 +151,7 @@ exports.getMessages = async (req, res) => {
           [Op.gt]: new Date()
         }
       },
-      attributes: ['id', 'conversationId', 'senderId', 'content', 'createdAt', 'expiresAt', 'reactions'],
+      attributes: ['id', 'conversationId', 'senderId', 'content', 'replyToId', 'reactions', 'createdAt', 'expiresAt'],
       include: [
         {
           model: User,
@@ -162,17 +162,48 @@ exports.getMessages = async (req, res) => {
       order: [['createdAt', 'ASC']]
     });
 
-    // Format messages to ensure reactions is always an object
+    // Get all replied-to messages
+    const replyToIds = messages.map(m => m.replyToId).filter(id => id);
+    const repliedMessages = replyToIds.length > 0 ? await Message.findAll({
+      where: {
+        id: replyToIds
+      },
+      include: [{
+        model: User,
+        as: 'sender',
+        attributes: ['id', 'displayName']
+      }]
+    }) : [];
+
+    const repliedMessagesMap = {};
+    repliedMessages.forEach(msg => {
+      repliedMessagesMap[msg.id] = {
+        id: msg.id,
+        senderId: msg.senderId,
+        content: msg.content,
+        sender: {
+          id: msg.sender.id,
+          displayName: msg.sender.displayName
+        }
+      };
+    });
+
+    // Format messages
     const formattedMessages = messages.map(msg => ({
       id: msg.id,
       conversationId: msg.conversationId,
       senderId: msg.senderId,
       content: msg.content,
+      replyToId: msg.replyToId,
+      replyToMessage: msg.replyToId ? repliedMessagesMap[msg.replyToId] : null,
       createdAt: msg.createdAt,
       expiresAt: msg.expiresAt,
       reactions: msg.reactions || {},
       sender: msg.sender
     }));
+
+    console.log(`Returning ${formattedMessages.length} messages. First message reactions:`, 
+                formattedMessages[0]?.reactions);
 
     res.json({ messages: formattedMessages });
   } catch (error) {
@@ -272,8 +303,8 @@ exports.addReaction = async (req, res) => {
       return res.status(403).json({ error: 'Not authorized' });
     }
 
-    // Update reactions
-    const reactions = message.reactions || {};
+    // Update reactions - create a new object for Sequelize to detect change
+    const reactions = JSON.parse(JSON.stringify(message.reactions || {}));
     if (!reactions[emoji]) {
       reactions[emoji] = [];
     }
@@ -283,9 +314,18 @@ exports.addReaction = async (req, res) => {
       reactions[emoji].push(userId);
     }
 
-    message.reactions = reactions;
-    message.changed('reactions', true); // Mark as changed for Sequelize
-    await message.save();
+    // Update using raw query with JSONB cast
+    const { sequelize } = require('../models');
+    await sequelize.query(
+      'UPDATE messages SET reactions = :reactions::jsonb WHERE id = :id',
+      {
+        replacements: { reactions: JSON.stringify(reactions), id: messageId },
+        type: sequelize.QueryTypes.UPDATE
+      }
+    );
+    
+    // Reload to get fresh data
+    await message.reload();
 
     res.json({ reactions: message.reactions });
   } catch (error) {
@@ -317,8 +357,8 @@ exports.removeReaction = async (req, res) => {
       return res.status(403).json({ error: 'Not authorized' });
     }
 
-    // Update reactions
-    const reactions = message.reactions || {};
+    // Update reactions - create a new object for Sequelize to detect change
+    const reactions = JSON.parse(JSON.stringify(message.reactions || {}));
     if (reactions[emoji]) {
       reactions[emoji] = reactions[emoji].filter(id => id !== userId);
       
@@ -328,9 +368,18 @@ exports.removeReaction = async (req, res) => {
       }
     }
 
-    message.reactions = reactions;
-    message.changed('reactions', true); // Mark as changed for Sequelize
-    await message.save();
+    // Update using raw query with JSONB cast
+    const { sequelize } = require('../models');
+    await sequelize.query(
+      'UPDATE messages SET reactions = :reactions::jsonb WHERE id = :id',
+      {
+        replacements: { reactions: JSON.stringify(reactions), id: messageId },
+        type: sequelize.QueryTypes.UPDATE
+      }
+    );
+    
+    // Reload to get fresh data
+    await message.reload();
 
     res.json({ reactions: message.reactions });
   } catch (error) {

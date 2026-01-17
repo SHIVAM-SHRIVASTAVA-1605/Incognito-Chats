@@ -14,6 +14,7 @@ class StorageService {
     Hive.registerAdapter(UserModelAdapter());
     Hive.registerAdapter(ConversationModelAdapter());
     Hive.registerAdapter(MessageModelAdapter());
+    Hive.registerAdapter(ReplyToMessageAdapter());
     
     try {
       await Hive.openBox<ConversationModel>(conversationsBox);

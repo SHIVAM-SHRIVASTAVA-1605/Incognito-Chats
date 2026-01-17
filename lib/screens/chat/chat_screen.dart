@@ -378,6 +378,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       message: message,
                       isMe: isMe,
                       onDelete: isMe ? () => _deleteMessage(message.id) : null,
+                      onReply: () => context
+                          .read<ChatProvider>()
+                          .setReplyToMessage(message),
                     );
                   },
                 );
@@ -412,48 +415,115 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             )
           else
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.secondaryDark,
-                border: Border(
-                  top: BorderSide(
-                    color: AppTheme.tertiaryDark,
-                    width: 1,
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      decoration: InputDecoration(
-                        hintText: 'Type a message...',
-                        filled: true,
-                        fillColor: AppTheme.tertiaryDark,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
+            Column(
+              children: [
+                // Reply preview
+                Consumer<ChatProvider>(
+                  builder: (context, chatProvider, _) {
+                    if (chatProvider.replyingToMessage == null) {
+                      return const SizedBox.shrink();
+                    }
+
+                    final replyMsg = chatProvider.replyingToMessage!;
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.tertiaryDark,
+                        border: Border(
+                          top:
+                              BorderSide(color: AppTheme.accentColor, width: 2),
                         ),
                       ),
-                      maxLines: null,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendMessage(),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 3,
+                            height: 40,
+                            color: AppTheme.accentColor,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Replying to ${replyMsg.sender?.displayName ?? "Unknown"}',
+                                  style: TextStyle(
+                                    color: AppTheme.accentColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  replyMsg.content.length > 50
+                                      ? '${replyMsg.content.substring(0, 50)}...'
+                                      : replyMsg.content,
+                                  style: TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            color: AppTheme.textSecondary,
+                            onPressed: () => chatProvider.clearReply(),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                // Message input
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.secondaryDark,
+                    border: Border(
+                      top: BorderSide(
+                        color: AppTheme.tertiaryDark,
+                        width: 1,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.send),
-                    onPressed: _sendMessage,
-                    color: AppTheme.accentColor,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _messageController,
+                          decoration: InputDecoration(
+                            hintText: 'Type a message...',
+                            filled: true,
+                            fillColor: AppTheme.tertiaryDark,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                          ),
+                          maxLines: null,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _sendMessage(),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.send),
+                        onPressed: _sendMessage,
+                        color: AppTheme.accentColor,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
         ],
       ),

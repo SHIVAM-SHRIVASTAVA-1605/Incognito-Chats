@@ -30,7 +30,13 @@ class MessageModel extends HiveObject {
   String status; // 'pending', 'sent', 'delivered'
 
   @HiveField(8)
-  Map<String, List<String>> reactions; // emoji -> list of user IDs
+  String? replyToId;
+
+  @HiveField(9)
+  ReplyToMessage? replyToMessage;
+
+  @HiveField(10)
+  Map<String, List<String>> reactions;
 
   MessageModel({
     required this.id,
@@ -41,21 +47,14 @@ class MessageModel extends HiveObject {
     required this.expiresAt,
     this.sender,
     this.status = 'pending',
+    this.replyToId,
+    this.replyToMessage,
     Map<String, List<String>>? reactions,
   }) : reactions = reactions ?? {};
 
   bool get isExpired => DateTime.now().isAfter(expiresAt);
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
-    // Parse reactions
-    Map<String, List<String>> reactionsMap = {};
-    if (json['reactions'] != null) {
-      final reactionsJson = json['reactions'] as Map<String, dynamic>;
-      reactionsJson.forEach((emoji, users) {
-        reactionsMap[emoji] = List<String>.from(users as List);
-      });
-    }
-
     return MessageModel(
       id: json['id'] as String,
       conversationId: json['conversationId'] as String,
@@ -67,7 +66,19 @@ class MessageModel extends HiveObject {
           ? UserModel.fromJson(json['sender'] as Map<String, dynamic>)
           : null,
       status: json['status'] as String? ?? 'sent',
-      reactions: reactionsMap,
+      replyToId: json['replyToId'] as String?,
+      replyToMessage: json['replyToMessage'] != null
+          ? ReplyToMessage.fromJson(
+              json['replyToMessage'] as Map<String, dynamic>)
+          : null,
+      reactions: json['reactions'] != null
+          ? (json['reactions'] as Map<String, dynamic>).map(
+              (key, value) => MapEntry(
+                key,
+                (value as List<dynamic>).map((e) => e.toString()).toList(),
+              ),
+            )
+          : {},
     );
   }
 
@@ -77,11 +88,55 @@ class MessageModel extends HiveObject {
       'conversationId': conversationId,
       'senderId': senderId,
       'content': content,
+      'replyToId': replyToId,
+      'replyToMessage': replyToMessage?.toJson(),
       'createdAt': createdAt.toIso8601String(),
       'expiresAt': expiresAt.toIso8601String(),
       'sender': sender?.toJson(),
       'status': status,
       'reactions': reactions,
+    };
+  }
+}
+
+@HiveType(typeId: 3)
+class ReplyToMessage extends HiveObject {
+  @HiveField(0)
+  String id;
+
+  @HiveField(1)
+  String senderId;
+
+  @HiveField(2)
+  String content;
+
+  @HiveField(3)
+  UserModel? sender;
+
+  ReplyToMessage({
+    required this.id,
+    required this.senderId,
+    required this.content,
+    this.sender,
+  });
+
+  factory ReplyToMessage.fromJson(Map<String, dynamic> json) {
+    return ReplyToMessage(
+      id: json['id'] as String,
+      senderId: json['senderId'] as String,
+      content: json['content'] as String,
+      sender: json['sender'] != null
+          ? UserModel.fromJson(json['sender'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'senderId': senderId,
+      'content': content,
+      'sender': sender?.toJson(),
     };
   }
 }

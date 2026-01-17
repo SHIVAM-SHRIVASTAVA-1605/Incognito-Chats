@@ -10,12 +10,14 @@ class MessageBubble extends StatelessWidget {
   final MessageModel message;
   final bool isMe;
   final VoidCallback? onDelete;
+  final VoidCallback? onReply;
 
   const MessageBubble({
     super.key,
     required this.message,
     required this.isMe,
     this.onDelete,
+    this.onReply,
   });
 
   String _formatTimestamp(DateTime timestamp) {
@@ -195,12 +197,21 @@ class MessageBubble extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.add_reaction,
+                    leading: const Icon(Icons.emoji_emotions,
                         color: AppTheme.accentColor),
-                    title: const Text('Add reaction'),
+                    title: const Text('React'),
                     onTap: () {
                       Navigator.pop(context);
                       _showReactionPicker(context);
+                    },
+                  ),
+                  ListTile(
+                    leading:
+                        const Icon(Icons.reply, color: AppTheme.accentColor),
+                    title: const Text('Reply'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      if (onReply != null) onReply!();
                     },
                   ),
                   if (onDelete != null)
@@ -245,6 +256,54 @@ class MessageBubble extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Show replied-to message if exists
+                    if (message.replyToMessage != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: isMe
+                              ? Colors.white.withOpacity(0.2)
+                              : AppTheme.tertiaryDark,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border(
+                            left: BorderSide(
+                              color: isMe ? Colors.white : AppTheme.accentColor,
+                              width: 3,
+                            ),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              message.replyToMessage!.sender?.displayName ??
+                                  'Unknown',
+                              style: TextStyle(
+                                color:
+                                    isMe ? Colors.white : AppTheme.accentColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              message.replyToMessage!.content.length > 50
+                                  ? '${message.replyToMessage!.content.substring(0, 50)}...'
+                                  : message.replyToMessage!.content,
+                              style: TextStyle(
+                                color: isMe
+                                    ? Colors.white.withOpacity(0.8)
+                                    : AppTheme.textSecondary,
+                                fontSize: 12,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     Text(
                       message.content,
                       style: TextStyle(

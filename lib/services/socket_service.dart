@@ -109,11 +109,12 @@ class SocketService {
     }
   }
 
-  void sendMessage(String conversationId, String content) {
+  void sendMessage(String conversationId, String content, {String? replyToId}) {
     if (_isConnected) {
       _socket!.emit('sendMessage', {
         'conversationId': conversationId,
         'content': content,
+        'replyToId': replyToId,
       });
     }
   }

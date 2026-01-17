@@ -17,11 +17,13 @@ class ChatProvider extends ChangeNotifier {
   String? _currentConversationId;
   bool _isLoading = false;
   String? _error;
+  MessageModel? _replyingToMessage;
 
   List<ConversationModel> get conversations => _conversations;
   List<MessageModel> get messages => _messages;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  MessageModel? get replyingToMessage => _replyingToMessage;
 
   ChatProvider({
     required AuthService authService,
@@ -179,6 +181,15 @@ class ChatProvider extends ChangeNotifier {
         createdAt: DateTime.now(),
         expiresAt: DateTime.now().add(const Duration(hours: 12)),
         status: 'pending',
+        replyToId: _replyingToMessage?.id,
+        replyToMessage: _replyingToMessage != null
+            ? ReplyToMessage(
+                id: _replyingToMessage!.id,
+                senderId: _replyingToMessage!.senderId,
+                content: _replyingToMessage!.content,
+                sender: _replyingToMessage!.sender,
+              )
+            : null,
       );
 
       // Add to UI immediately
@@ -186,8 +197,25 @@ class ChatProvider extends ChangeNotifier {
       notifyListeners();
 
       // Send to server
-      _socketService.sendMessage(_currentConversationId!, content.trim());
+      _socketService.sendMessage(
+        _currentConversationId!,
+        content.trim(),
+        replyToId: _replyingToMessage?.id,
+      );
+
+      // Clear reply
+      clearReply();
     }
+  }
+
+  void setReplyToMessage(MessageModel message) {
+    _replyingToMessage = message;
+    notifyListeners();
+  }
+
+  void clearReply() {
+    _replyingToMessage = null;
+    notifyListeners();
   }
 
   void deleteMessage(String messageId) {

@@ -65,7 +65,7 @@ class SocketHandler {
       // Send message
       socket.on('sendMessage', async (data) => {
         try {
-          const { conversationId, content } = data;
+          const { conversationId, content, replyToId } = data;
 
           if (!socket.userId) {
             return socket.emit('error', { message: 'Not authenticated' });
@@ -110,6 +110,7 @@ class SocketHandler {
             conversationId,
             senderId: socket.userId,
             content: content.trim(),
+            replyToId: replyToId || null,
             expiresAt
           });
 
@@ -125,14 +126,39 @@ class SocketHandler {
             attributes: ['id', 'displayName']
           });
 
+          // Get replied-to message if exists
+          let replyToMessage = null;
+          if (message.replyToId) {
+            const repliedMsg = await Message.findByPk(message.replyToId, {
+              include: [{
+                model: User,
+                as: 'sender',
+                attributes: ['id', 'displayName']
+              }]
+            });
+            if (repliedMsg) {
+              replyToMessage = {
+                id: repliedMsg.id,
+                senderId: repliedMsg.senderId,
+                content: repliedMsg.content,
+                sender: {
+                  id: repliedMsg.sender.id,
+                  displayName: repliedMsg.sender.displayName
+                }
+              };
+            }
+          }
+
           const messageData = {
             id: message.id,
             conversationId: message.conversationId,
             senderId: message.senderId,
             content: message.content,
+            replyToId: message.replyToId,
+            replyToMessage: replyToMessage,
+            reactions: message.reactions || {},
             createdAt: message.createdAt,
             expiresAt: message.expiresAt,
-            reactions: message.reactions || {},
             sender: {
               id: sender.id,
               displayName: sender.displayName
@@ -203,8 +229,8 @@ class SocketHandler {
             return socket.emit('error', { message: 'Not authorized' });
           }
 
-          // Update reactions
-          const reactions = message.reactions || {};
+          // Update reactions - create a new object for Sequelize to detect change
+          const reactions = JSON.parse(JSON.stringify(message.reactions || {}));
           if (!reactions[emoji]) {
             reactions[emoji] = [];
           }
@@ -214,9 +240,20 @@ class SocketHandler {
             reactions[emoji].push(socket.userId);
           }
 
-          message.reactions = reactions;
-          message.changed('reactions', true); // Mark as changed for Sequelize
-          await message.save();
+          // Update using raw query with JSONB cast
+          await message.sequelize.query(
+            'UPDATE messages SET reactions = :reactions::jsonb WHERE id = :id',
+            {
+              replacements: { reactions: JSON.stringify(reactions), id: messageId },
+              type: message.sequelize.QueryTypes.UPDATE
+            }
+          );
+          
+          // Reload to get fresh data
+          await message.reload();
+
+          console.log(`Reaction added to message ${messageId}. New reactions:`, JSON.stringify(message.reactions));
+          console.log(`Message reactions type:`, typeof message.reactions, 'dataValues:', message.dataValues.reactions);
 
           // Notify all users in the conversation
           this.io.to(conversationId).emit('reactionAdded', {
@@ -255,8 +292,8 @@ class SocketHandler {
             return socket.emit('error', { message: 'Not authorized' });
           }
 
-          // Update reactions
-          const reactions = message.reactions || {};
+          // Update reactions - create a new object for Sequelize to detect change
+          const reactions = JSON.parse(JSON.stringify(message.reactions || {}));
           if (reactions[emoji]) {
             reactions[emoji] = reactions[emoji].filter(id => id !== socket.userId);
             
@@ -266,9 +303,17 @@ class SocketHandler {
             }
           }
 
-          message.reactions = reactions;
-          message.changed('reactions', true); // Mark as changed for Sequelize
-          await message.save();
+          // Update using raw query with JSONB cast
+          await message.sequelize.query(
+            'UPDATE messages SET reactions = :reactions::jsonb WHERE id = :id',
+            {
+              replacements: { reactions: JSON.stringify(reactions), id: messageId },
+              type: message.sequelize.QueryTypes.UPDATE
+            }
+          );
+          
+          // Reload to get fresh data
+          await message.reload();
 
           // Notify all users in the conversation
           this.io.to(conversationId).emit('reactionRemoved', {
