@@ -5,6 +5,7 @@ const { Op } = require('sequelize');
 exports.getConversations = async (req, res) => {
   try {
     const userId = req.user.id;
+    const currentUser = await User.findByPk(userId);
 
     const conversations = await Conversation.findAll({
       where: {
@@ -17,12 +18,12 @@ exports.getConversations = async (req, res) => {
         {
           model: User,
           as: 'participant1',
-          attributes: ['id', 'displayName', 'profilePicture']
+          attributes: ['id', 'displayName', 'profilePicture', 'blockedUsers']
         },
         {
           model: User,
           as: 'participant2',
-          attributes: ['id', 'displayName', 'profilePicture']
+          attributes: ['id', 'displayName', 'profilePicture', 'blockedUsers']
         }
       ],
       order: [['lastMessageAt', 'DESC']]
@@ -31,6 +32,9 @@ exports.getConversations = async (req, res) => {
     // Format response to show the other participant
     const formattedConversations = conversations.map(conv => {
       const otherUser = conv.participant1Id === userId ? conv.participant2 : conv.participant1;
+      const isBlocked = (currentUser.blockedUsers && currentUser.blockedUsers.includes(otherUser.id)) ||
+                        (otherUser.blockedUsers && otherUser.blockedUsers.includes(userId));
+      
       return {
         id: conv.id,
         otherUser: {
@@ -39,7 +43,8 @@ exports.getConversations = async (req, res) => {
           profilePicture: otherUser.profilePicture
         },
         lastMessageAt: conv.lastMessageAt,
-        lastMessagePreview: conv.lastMessagePreview
+        lastMessagePreview: conv.lastMessagePreview,
+        isBlocked: isBlocked
       };
     });
 
@@ -80,7 +85,17 @@ exports.getOrCreateConversation = async (req, res) => {
       }
     });
 
-    // Create new conversation if doesn't exist
+    // Check if either user has blocked the other
+    const currentUser = await User.findByPk(userId);
+    const isBlocked = (currentUser.blockedUsers && currentUser.blockedUsers.includes(otherUserId)) ||
+                      (otherUser.blockedUsers && otherUser.blockedUsers.includes(userId));
+    
+    // If blocked, only allow access to existing conversations, not creating new ones
+    if (isBlocked && !conversation) {
+      return res.status(403).json({ error: 'Cannot create conversation with this user' });
+    }
+
+    // Create new conversation if doesn't exist and not blocked
     if (!conversation) {
       conversation = await Conversation.create({
         participant1Id: userId,
@@ -97,7 +112,8 @@ exports.getOrCreateConversation = async (req, res) => {
           profilePicture: otherUser.profilePicture
         },
         lastMessageAt: conversation.lastMessageAt,
-        lastMessagePreview: conversation.lastMessagePreview
+        lastMessagePreview: conversation.lastMessagePreview,
+        isBlocked: isBlocked
       }
     });
   } catch (error) {

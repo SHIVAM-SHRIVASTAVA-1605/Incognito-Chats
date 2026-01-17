@@ -172,22 +172,140 @@ exports.searchUsers = async (req, res) => {
       return res.status(400).json({ error: 'Query must be at least 2 characters' });
     }
 
+    const currentUser = await User.findByPk(req.user.id);
+
     const users = await User.findAll({
       where: {
         displayName: {
           [require('sequelize').Op.iLike]: `%${query}%`
         }
       },
-      attributes: ['id', 'displayName', 'bio', 'profilePicture'],
+      attributes: ['id', 'displayName', 'bio', 'profilePicture', 'blockedUsers'],
       limit: 20
     });
 
-    // Filter out current user
-    const filteredUsers = users.filter(u => u.id !== req.user.id);
+    // Filter out current user and users who blocked the current user
+    const filteredUsers = users.filter(u => {
+      if (u.id === req.user.id) return false;
+      // If the searched user has blocked the current user, don't show them
+      if (u.blockedUsers && u.blockedUsers.includes(req.user.id)) return false;
+      return true;
+    });
 
-    res.json({ users: filteredUsers });
+    // Remove blockedUsers field from response
+    const sanitizedUsers = filteredUsers.map(u => ({
+      id: u.id,
+      displayName: u.displayName,
+      bio: u.bio,
+      profilePicture: u.profilePicture
+    }));
+
+    res.json({ users: sanitizedUsers });
   } catch (error) {
     console.error('Search users error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Block a user
+exports.blockUser = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    if (userId === req.user.id) {
+      return res.status(400).json({ error: 'Cannot block yourself' });
+    }
+
+    // Check if user exists
+    const userToBlock = await User.findByPk(userId);
+    if (!userToBlock) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const currentUser = await User.findByPk(req.user.id);
+    
+    // Check if already blocked
+    if (currentUser.blockedUsers && currentUser.blockedUsers.includes(userId)) {
+      return res.status(400).json({ error: 'User is already blocked' });
+    }
+
+    // Add to blocked users
+    const blockedUsers = currentUser.blockedUsers || [];
+    currentUser.blockedUsers = [...blockedUsers, userId];
+    await currentUser.save();
+
+    res.json({ message: 'User blocked successfully' });
+  } catch (error) {
+    console.error('Block user error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Unblock a user
+exports.unblockUser = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const currentUser = await User.findByPk(req.user.id);
+    
+    // Check if user is blocked
+    if (!currentUser.blockedUsers || !currentUser.blockedUsers.includes(userId)) {
+      return res.status(400).json({ error: 'User is not blocked' });
+    }
+
+    // Remove from blocked users
+    currentUser.blockedUsers = currentUser.blockedUsers.filter(id => id !== userId);
+    await currentUser.save();
+
+    res.json({ message: 'User unblocked successfully' });
+  } catch (error) {
+    console.error('Unblock user error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Get blocked users list
+exports.getBlockedUsers = async (req, res) => {
+  try {
+    const currentUser = await User.findByPk(req.user.id);
+    
+    if (!currentUser.blockedUsers || currentUser.blockedUsers.length === 0) {
+      return res.json({ blockedUsers: [] });
+    }
+
+    const blockedUsers = await User.findAll({
+      where: {
+        id: currentUser.blockedUsers
+      },
+      attributes: ['id', 'displayName', 'profilePicture']
+    });
+
+    res.json({ blockedUsers });
+  } catch (error) {
+    console.error('Get blocked users error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Check if user is blocked
+exports.isUserBlocked = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const currentUser = await User.findByPk(req.user.id);
+    const isBlocked = currentUser.blockedUsers && currentUser.blockedUsers.includes(userId);
+
+    res.json({ isBlocked });
+  } catch (error) {
+    console.error('Check blocked user error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 };

@@ -39,6 +39,11 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true
   },
+  blockedUsers: {
+    type: DataTypes.ARRAY(DataTypes.UUID),
+    defaultValue: [],
+    allowNull: false
+  },
   createdAt: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW

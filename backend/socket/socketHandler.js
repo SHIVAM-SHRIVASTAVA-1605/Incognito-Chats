@@ -90,6 +90,17 @@ class SocketHandler {
             return socket.emit('error', { message: 'Conversation not found' });
           }
 
+          // Check if either user has blocked the other
+          const otherUserId = conversation.participant1Id === socket.userId ? conversation.participant2Id : conversation.participant1Id;
+          const currentUser = await User.findByPk(socket.userId);
+          const otherUser = await User.findByPk(otherUserId);
+          const isBlocked = (currentUser.blockedUsers && currentUser.blockedUsers.includes(otherUserId)) ||
+                            (otherUser.blockedUsers && otherUser.blockedUsers.includes(socket.userId));
+          
+          if (isBlocked) {
+            return socket.emit('error', { message: 'Cannot send message - user blocked' });
+          }
+
           // Calculate expiry time
           const expiryHours = parseFloat(process.env.MESSAGE_EXPIRY_HOURS) || 12;
           const expiresAt = new Date(Date.now() + expiryHours * 60 * 60 * 1000);
