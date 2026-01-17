@@ -151,6 +151,7 @@ exports.getMessages = async (req, res) => {
           [Op.gt]: new Date()
         }
       },
+      attributes: ['id', 'conversationId', 'senderId', 'content', 'createdAt', 'expiresAt', 'reactions'],
       include: [
         {
           model: User,
@@ -161,7 +162,19 @@ exports.getMessages = async (req, res) => {
       order: [['createdAt', 'ASC']]
     });
 
-    res.json({ messages });
+    // Format messages to ensure reactions is always an object
+    const formattedMessages = messages.map(msg => ({
+      id: msg.id,
+      conversationId: msg.conversationId,
+      senderId: msg.senderId,
+      content: msg.content,
+      createdAt: msg.createdAt,
+      expiresAt: msg.expiresAt,
+      reactions: msg.reactions || {},
+      sender: msg.sender
+    }));
+
+    res.json({ messages: formattedMessages });
   } catch (error) {
     console.error('Get messages error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -226,6 +239,102 @@ exports.deleteMessage = async (req, res) => {
     res.json({ message: 'Message deleted successfully' });
   } catch (error) {
     console.error('Delete message error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Add reaction to message
+exports.addReaction = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user.id;
+
+    if (!emoji) {
+      return res.status(400).json({ error: 'Emoji is required' });
+    }
+
+    // Find message
+    const message = await Message.findByPk(messageId, {
+      include: [{
+        model: require('./Message').sequelize.models.Conversation,
+        as: 'conversation'
+      }]
+    });
+
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    // Verify user is part of conversation
+    const conversation = await Conversation.findByPk(message.conversationId);
+    if (conversation.participant1Id !== userId && conversation.participant2Id !== userId) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    // Update reactions
+    const reactions = message.reactions || {};
+    if (!reactions[emoji]) {
+      reactions[emoji] = [];
+    }
+    
+    // Add user to reaction if not already present
+    if (!reactions[emoji].includes(userId)) {
+      reactions[emoji].push(userId);
+    }
+
+    message.reactions = reactions;
+    message.changed('reactions', true); // Mark as changed for Sequelize
+    await message.save();
+
+    res.json({ reactions: message.reactions });
+  } catch (error) {
+    console.error('Add reaction error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// Remove reaction from message
+exports.removeReaction = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user.id;
+
+    if (!emoji) {
+      return res.status(400).json({ error: 'Emoji is required' });
+    }
+
+    // Find message
+    const message = await Message.findByPk(messageId);
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    // Verify user is part of conversation
+    const conversation = await Conversation.findByPk(message.conversationId);
+    if (conversation.participant1Id !== userId && conversation.participant2Id !== userId) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    // Update reactions
+    const reactions = message.reactions || {};
+    if (reactions[emoji]) {
+      reactions[emoji] = reactions[emoji].filter(id => id !== userId);
+      
+      // Remove emoji key if no users left
+      if (reactions[emoji].length === 0) {
+        delete reactions[emoji];
+      }
+    }
+
+    message.reactions = reactions;
+    message.changed('reactions', true); // Mark as changed for Sequelize
+    await message.save();
+
+    res.json({ reactions: message.reactions });
+  } catch (error) {
+    console.error('Remove reaction error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 };

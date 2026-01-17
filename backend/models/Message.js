@@ -27,6 +27,10 @@ const Message = sequelize.define('Message', {
     type: DataTypes.TEXT,
     allowNull: false
   },
+  reactions: {
+    type: DataTypes.JSONB,
+    defaultValue: {}
+  },
   createdAt: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW

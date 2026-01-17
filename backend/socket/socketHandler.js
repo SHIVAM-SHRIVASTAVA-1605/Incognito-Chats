@@ -132,6 +132,7 @@ class SocketHandler {
             content: message.content,
             createdAt: message.createdAt,
             expiresAt: message.expiresAt,
+            reactions: message.reactions || {},
             sender: {
               id: sender.id,
               displayName: sender.displayName
@@ -174,6 +175,110 @@ class SocketHandler {
         } catch (error) {
           console.error('Delete message error:', error);
           socket.emit('error', { message: 'Failed to delete message' });
+        }
+      });
+
+      // Add reaction
+      socket.on('addReaction', async (data) => {
+        try {
+          const { messageId, emoji, conversationId } = data;
+
+          if (!socket.userId) {
+            return socket.emit('error', { message: 'Not authenticated' });
+          }
+
+          if (!emoji) {
+            return socket.emit('error', { message: 'Emoji is required' });
+          }
+
+          // Find message
+          const message = await Message.findByPk(messageId);
+          if (!message) {
+            return socket.emit('error', { message: 'Message not found' });
+          }
+
+          // Verify user is part of conversation
+          const conversation = await Conversation.findByPk(message.conversationId);
+          if (conversation.participant1Id !== socket.userId && conversation.participant2Id !== socket.userId) {
+            return socket.emit('error', { message: 'Not authorized' });
+          }
+
+          // Update reactions
+          const reactions = message.reactions || {};
+          if (!reactions[emoji]) {
+            reactions[emoji] = [];
+          }
+          
+          // Add user to reaction if not already present
+          if (!reactions[emoji].includes(socket.userId)) {
+            reactions[emoji].push(socket.userId);
+          }
+
+          message.reactions = reactions;
+          message.changed('reactions', true); // Mark as changed for Sequelize
+          await message.save();
+
+          // Notify all users in the conversation
+          this.io.to(conversationId).emit('reactionAdded', {
+            messageId,
+            reactions: message.reactions
+          });
+          console.log(`Reaction added to message ${messageId}`);
+        } catch (error) {
+          console.error('Add reaction error:', error);
+          socket.emit('error', { message: 'Failed to add reaction' });
+        }
+      });
+
+      // Remove reaction
+      socket.on('removeReaction', async (data) => {
+        try {
+          const { messageId, emoji, conversationId } = data;
+
+          if (!socket.userId) {
+            return socket.emit('error', { message: 'Not authenticated' });
+          }
+
+          if (!emoji) {
+            return socket.emit('error', { message: 'Emoji is required' });
+          }
+
+          // Find message
+          const message = await Message.findByPk(messageId);
+          if (!message) {
+            return socket.emit('error', { message: 'Message not found' });
+          }
+
+          // Verify user is part of conversation
+          const conversation = await Conversation.findByPk(message.conversationId);
+          if (conversation.participant1Id !== socket.userId && conversation.participant2Id !== socket.userId) {
+            return socket.emit('error', { message: 'Not authorized' });
+          }
+
+          // Update reactions
+          const reactions = message.reactions || {};
+          if (reactions[emoji]) {
+            reactions[emoji] = reactions[emoji].filter(id => id !== socket.userId);
+            
+            // Remove emoji key if no users left
+            if (reactions[emoji].length === 0) {
+              delete reactions[emoji];
+            }
+          }
+
+          message.reactions = reactions;
+          message.changed('reactions', true); // Mark as changed for Sequelize
+          await message.save();
+
+          // Notify all users in the conversation
+          this.io.to(conversationId).emit('reactionRemoved', {
+            messageId,
+            reactions: message.reactions
+          });
+          console.log(`Reaction removed from message ${messageId}`);
+        } catch (error) {
+          console.error('Remove reaction error:', error);
+          socket.emit('error', { message: 'Failed to remove reaction' });
         }
       });
 

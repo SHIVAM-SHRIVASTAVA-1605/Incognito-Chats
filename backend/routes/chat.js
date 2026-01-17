@@ -8,5 +8,7 @@ router.post('/conversations', authMiddleware, chatController.getOrCreateConversa
 router.get('/conversations/:conversationId/messages', authMiddleware, chatController.getMessages);
 router.delete('/conversations/:conversationId', authMiddleware, chatController.deleteConversation);
 router.delete('/messages/:messageId', authMiddleware, chatController.deleteMessage);
+router.post('/messages/:messageId/reactions', authMiddleware, chatController.addReaction);
+router.delete('/messages/:messageId/reactions', authMiddleware, chatController.removeReaction);
 
 module.exports = router;
