@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../../models/conversation_model.dart';
+import '../../providers/chat_provider.dart';
 import '../../config/theme.dart';
 import '../../config/config.dart';
 import '../screens/chat/chat_screen.dart';
@@ -27,6 +29,37 @@ class ConversationTile extends StatelessWidget {
       return DateFormat('EEEE').format(timestamp);
     } else {
       return DateFormat('MMM d').format(timestamp);
+    }
+  }
+
+  Future<void> _deleteConversation(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Conversation'),
+        content: const Text('Are you sure you want to delete this conversation? All messages will be permanently deleted.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final chatProvider = context.read<ChatProvider>();
+      await chatProvider.deleteConversation(conversation.id);
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Conversation deleted')),
+        );
+      }
     }
   }
 
@@ -78,6 +111,7 @@ class ConversationTile extends StatelessWidget {
           ),
         );
       },
+      onLongPress: () => _deleteConversation(context),
     );
   }
 }
