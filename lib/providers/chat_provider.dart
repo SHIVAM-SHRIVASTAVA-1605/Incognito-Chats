@@ -208,6 +208,28 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> deleteAllConversations() async {
+    _isLoading = true;
+    notifyListeners();
+
+    // Get all conversation IDs
+    final conversationIds = _conversations.map((c) => c.id).toList();
+    
+    // Delete each conversation from backend
+    for (final id in conversationIds) {
+      await _chatService.deleteConversation(id);
+    }
+    
+    // Clear all from local storage
+    await _storageService.clearConversations();
+    
+    // Clear in-memory list
+    _conversations.clear();
+    
+    _isLoading = false;
+    notifyListeners();
+  }
+
   void leaveConversation() {
     if (_currentConversationId != null) {
       _socketService.leaveConversation(_currentConversationId!);

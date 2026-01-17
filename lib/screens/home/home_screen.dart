@@ -24,6 +24,54 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _panicDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.red.shade900,
+        title: Row(
+          children: const [
+            Icon(Icons.warning, color: Colors.white),
+            SizedBox(width: 8),
+            Text('Panic Delete', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: const Text(
+          'This will permanently delete ALL conversations and messages. This action cannot be undone.\n\nAre you absolutely sure?',
+          style: TextStyle(color: Colors.white),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.red,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('DELETE ALL'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final chatProvider = context.read<ChatProvider>();
+      await chatProvider.deleteAllConversations();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('All conversations deleted'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -62,6 +110,11 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Incognito Chats'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_forever, color: Colors.red),
+            tooltip: 'Panic Delete All',
+            onPressed: _panicDelete,
+          ),
           IconButton(
             icon: const Icon(Icons.person_outline),
             onPressed: () {
