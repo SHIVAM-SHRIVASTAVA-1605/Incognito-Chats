@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:screen_protector/screen_protector.dart';
 import '../../providers/app_provider.dart';
 import '../../models/user_model.dart';
+import '../../services/biometric_service.dart';
 import '../../config/theme.dart';
 import '../../config/config.dart';
 
@@ -22,6 +24,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isEditing = false;
   File? _selectedImage;
   bool _isUploadingImage = false;
+  
+  final BiometricService _biometricService = BiometricService();
+  bool _isBiometricAvailable = false;
+  bool _isBiometricEnabled = false;
+  String _biometricType = 'Biometric';
 
   @override
   void initState() {
@@ -29,6 +36,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final currentUser = context.read<AppProvider>().currentUser;
     _displayNameController = TextEditingController(text: currentUser?.displayName ?? '');
     _bioController = TextEditingController(text: currentUser?.bio ?? '');
+    _checkBiometricAvailability();
+  }
+
+  Future<void> _checkBiometricAvailability() async {
+    final isAvailable = await _biometricService.isBiometricAvailable();
+    final isEnabled = await _biometricService.isBiometricEnabled();
+    final biometrics = await _biometricService.getAvailableBiometrics();
+    
+    if (mounted) {
+      setState(() {
+        _isBiometricAvailable = isAvailable;
+        _isBiometricEnabled = isEnabled;
+        _biometricType = _biometricService.getBiometricTypeDisplay(biometrics);
+      });
+    }
+  }
+
+  void _showScreenshotAlert() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.red.shade900,
+        title: Row(
+          children: const [
+            Icon(Icons.warning, color: Colors.white, size: 28),
+            SizedBox(width: 12),
+            Text('Screenshot Detected!', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: const Text(
+          'A screenshot of your profile was just taken.\n\nYour privacy matters. Please be cautious about sharing personal information.',
+          style: TextStyle(color: Colors.white),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleBiometric(bool value) async {
+    if (value) {
+      // Authenticate before enabling
+      final authenticated = await _biometricService.authenticate(
+        reason: 'Verify your identity to enable $_biometricType authentication',
+      );
+      
+      if (authenticated) {
+        await _biometricService.setBiometricEnabled(true);
+        setState(() {
+          _isBiometricEnabled = true;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$_biometricType authentication enabled')),
+          );
+        }
+      }
+    } else {
+      await _biometricService.setBiometricEnabled(false);
+      setState(() {
+        _isBiometricEnabled = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$_biometricType authentication disabled')),
+        );
+      }
+    }
   }
 
   @override
@@ -365,7 +447,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-
+              // Biometric Authentication Toggle
+              if (_isBiometricAvailable)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.secondaryDark,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppTheme.accentColor.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.fingerprint,
+                            color: AppTheme.accentColor,
+                            size: 28,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '$_biometricType Authentication',
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Unlock app with $_biometricType',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: _isBiometricEnabled,
+                            onChanged: _toggleBiometric,
+                            activeColor: AppTheme.accentColor,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              if (_isBiometricAvailable)
+                const SizedBox(height: 24),
               // Privacy notice
               Container(
                 padding: const EdgeInsets.all(16),

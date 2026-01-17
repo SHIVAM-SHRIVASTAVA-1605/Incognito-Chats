@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:screen_protector/screen_protector.dart';
 import '../../models/conversation_model.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/app_provider.dart';
@@ -42,6 +43,48 @@ class _ChatScreenState extends State<ChatScreen> {
         context.read<ChatProvider>().removeExpiredMessages();
       }
     });
+  }
+
+  void _showScreenshotAlert() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.red.shade900,
+        title: Row(
+          children: const [
+            Icon(Icons.warning, color: Colors.white, size: 32),
+            SizedBox(width: 12),
+            Text('Screenshot Detected!', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: Text(
+          'A screenshot was just taken of this conversation.\n\nReminder: This conversation is private and should remain confidential.',
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('I Understand', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    // Also show a persistent snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.warning, color: Colors.white),
+            SizedBox(width: 12),
+            Expanded(child: Text('⚠️ Screenshot detected in this conversation')),
+          ],
+        ),
+        backgroundColor: Colors.red,
+        duration: Duration(seconds: 5),
+      ),
+    );
   }
 
   @override

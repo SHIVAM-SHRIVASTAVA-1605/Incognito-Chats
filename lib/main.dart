@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:screen_protector/screen_protector.dart';
 import 'config/theme.dart';
 import 'config/config.dart';
 import 'providers/app_provider.dart';
 import 'providers/chat_provider.dart';
+import 'services/biometric_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 
@@ -19,7 +21,15 @@ void main() async {
     ),
   );
 
-  // Disable screenshot/screen recording (Android only - limited support)
+  // Enable app-wide screenshot and screen recording protection
+  try {
+    await ScreenProtector.protectDataLeakageOn();
+    debugPrint('✅ Screenshot protection enabled app-wide');
+  } catch (e) {
+    debugPrint('⚠️ Failed to enable screenshot protection: $e');
+  }
+
+  // Set edge-to-edge UI mode
   try {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   } catch (e) {
@@ -86,6 +96,30 @@ class _SplashScreenState extends State<SplashScreen> {
     await appProvider.initialize();
 
     if (mounted) {
+      // Check if biometric authentication is required
+      if (appProvider.isAuthenticated) {
+        final biometricService = BiometricService();
+        final isBiometricEnabled = await biometricService.isBiometricEnabled();
+        
+        if (isBiometricEnabled) {
+          final authenticated = await biometricService.authenticate(
+            reason: 'Unlock Incognito Chats',
+            useErrorDialogs: true,
+          );
+          
+          if (!authenticated) {
+            // If authentication fails, logout and go to login screen
+            await appProvider.logout();
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            }
+            return;
+          }
+        }
+      }
+      
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => appProvider.isAuthenticated
