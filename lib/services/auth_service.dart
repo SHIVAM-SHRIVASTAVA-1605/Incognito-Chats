@@ -17,8 +17,10 @@ class AuthService {
     _token = prefs.getString('auth_token');
     
     final userJson = prefs.getString('current_user');
+    print('🔧 AuthService.initialize() - userJson: $userJson');
     if (userJson != null) {
       _currentUser = UserModel.fromJson(jsonDecode(userJson));
+      print('🔧 AuthService.initialize() - Loaded user: ${_currentUser?.displayName}, profilePicture: ${_currentUser?.profilePicture}');
     }
   }
 
@@ -83,10 +85,17 @@ class AuthService {
   }
 
   Future<void> updateCurrentUser(UserModel user) async {
+    print('🔧 AuthService.updateCurrentUser() - Updating user: ${user.displayName}, profilePicture: ${user.profilePicture}');
     _currentUser = user;
     
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('current_user', jsonEncode(user.toJson()));
+    final userJson = jsonEncode(user.toJson());
+    print('🔧 AuthService.updateCurrentUser() - Saving to prefs: $userJson');
+    await prefs.setString('current_user', userJson);
+    
+    // Verify it was saved
+    final savedJson = prefs.getString('current_user');
+    print('🔧 AuthService.updateCurrentUser() - Verified saved: $savedJson');
   }
 
   Future<void> logout() async {
