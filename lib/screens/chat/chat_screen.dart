@@ -36,7 +36,7 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ChatProvider>().loadMessages(widget.conversation.id);
     });
-    
+
     // Check for expired messages every 5 seconds
     _expiryCheckTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (mounted) {
@@ -65,7 +65,9 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('I Understand', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text('I Understand',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -78,7 +80,8 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             Icon(Icons.warning, color: Colors.white),
             SizedBox(width: 12),
-            Expanded(child: Text('⚠️ Screenshot detected in this conversation')),
+            Expanded(
+                child: Text('⚠️ Screenshot detected in this conversation')),
           ],
         ),
         backgroundColor: Colors.red,
@@ -140,6 +143,92 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _blockUser(String userId, String userName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Block User'),
+        content: Text(
+          'Are you sure you want to block $userName?\n\n'
+          'You will no longer be able to send messages to each other, and they will not be able to find you in search.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Block'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final appProvider = context.read<AppProvider>();
+    final result = await appProvider.userService.blockUser(userId);
+
+    if (mounted) {
+      if (result['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$userName has been blocked')),
+        );
+        // Update conversation blocked status
+        setState(() {
+          widget.conversation.isBlocked = true;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['error'] ?? 'Failed to block user')),
+        );
+      }
+    }
+  }
+
+  Future<void> _unblockUser(String userId, String userName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Unblock User'),
+        content: Text('Are you sure you want to unblock $userName?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Unblock'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final appProvider = context.read<AppProvider>();
+    final result = await appProvider.userService.unblockUser(userId);
+
+    if (mounted) {
+      if (result['success']) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$userName has been unblocked')),
+        );
+        // Update conversation blocked status
+        setState(() {
+          widget.conversation.isBlocked = false;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['error'] ?? 'Failed to unblock user')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final appProvider = context.watch<AppProvider>();
@@ -181,14 +270,49 @@ class _ChatScreenState extends State<ChatScreen> {
                   Text(
                     'Messages expire in ${Config.messageExpiryHours}h',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontSize: 11,
-                    ),
+                          fontSize: 11,
+                        ),
                   ),
                 ],
               ),
             ),
           ],
         ),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'block') {
+                await _blockUser(otherUser.id, otherUser.displayName);
+              } else if (value == 'unblock') {
+                await _unblockUser(otherUser.id, otherUser.displayName);
+              }
+            },
+            itemBuilder: (context) => [
+              if (!widget.conversation.isBlocked)
+                const PopupMenuItem(
+                  value: 'block',
+                  child: Row(
+                    children: [
+                      Icon(Icons.block, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Block User'),
+                    ],
+                  ),
+                ),
+              if (widget.conversation.isBlocked)
+                const PopupMenuItem(
+                  value: 'unblock',
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green),
+                      SizedBox(width: 8),
+                      Text('Unblock User'),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -201,9 +325,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 }
 
                 // Filter out expired messages
-                final messages = chatProvider.messages
-                    .where((m) => !m.isExpired)
-                    .toList();
+                final messages =
+                    chatProvider.messages.where((m) => !m.isExpired).toList();
 
                 if (messages.isEmpty) {
                   return Center(
@@ -220,9 +343,12 @@ class _ChatScreenState extends State<ChatScreen> {
                           const SizedBox(height: 16),
                           Text(
                             'Start a secure conversation',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: AppTheme.textSecondary,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  color: AppTheme.textSecondary,
+                                ),
                           ),
                           const SizedBox(height: 8),
                           Text(
@@ -247,7 +373,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   itemBuilder: (context, index) {
                     final message = messages[index];
                     final isMe = message.senderId == currentUserId;
-                    
+
                     return MessageBubble(
                       message: message,
                       isMe: isMe,
@@ -260,49 +386,75 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
 
           // Message input
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppTheme.secondaryDark,
-              border: Border(
-                top: BorderSide(
-                  color: AppTheme.tertiaryDark,
-                  width: 1,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: InputDecoration(
-                      hintText: 'Type a message...',
-                      filled: true,
-                      fillColor: AppTheme.tertiaryDark,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                    ),
-                    maxLines: null,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _sendMessage(),
+          if (widget.conversation.isBlocked)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                border: Border(
+                  top: BorderSide(
+                    color: Colors.red.withOpacity(0.3),
+                    width: 1,
                   ),
                 ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _sendMessage,
-                  color: AppTheme.accentColor,
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.block, color: Colors.red, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'You cannot send messages to this user. Unblock to resume chatting.',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.secondaryDark,
+                border: Border(
+                  top: BorderSide(
+                    color: AppTheme.tertiaryDark,
+                    width: 1,
+                  ),
                 ),
-              ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: InputDecoration(
+                        hintText: 'Type a message...',
+                        filled: true,
+                        fillColor: AppTheme.tertiaryDark,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                      ),
+                      maxLines: null,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _sendMessage(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.send),
+                    onPressed: _sendMessage,
+                    color: AppTheme.accentColor,
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );

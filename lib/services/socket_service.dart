@@ -11,6 +11,8 @@ class SocketService {
   // Event callbacks
   Function(MessageModel)? onNewMessage;
   Function(String)? onMessageDeleted;
+  Function(String, Map<String, List<String>>)? onReactionAdded;
+  Function(String, Map<String, List<String>>)? onReactionRemoved;
   Function(String)? onError;
 
   void connect(String token) {
@@ -60,6 +62,26 @@ class SocketService {
       }
     });
 
+    _socket!.on('reactionAdded', (data) {
+      print('Reaction added to message: ${data['messageId']}');
+      if (onReactionAdded != null) {
+        final reactions = (data['reactions'] as Map<String, dynamic>).map(
+          (key, value) => MapEntry(key, List<String>.from(value as List)),
+        );
+        onReactionAdded!(data['messageId'], reactions);
+      }
+    });
+
+    _socket!.on('reactionRemoved', (data) {
+      print('Reaction removed from message: ${data['messageId']}');
+      if (onReactionRemoved != null) {
+        final reactions = (data['reactions'] as Map<String, dynamic>).map(
+          (key, value) => MapEntry(key, List<String>.from(value as List)),
+        );
+        onReactionRemoved!(data['messageId'], reactions);
+      }
+    });
+
     _socket!.on('error', (data) {
       print('Socket error: ${data['message']}');
       if (onError != null) {
@@ -100,6 +122,26 @@ class SocketService {
     if (_isConnected) {
       _socket!.emit('deleteMessage', {
         'messageId': messageId,
+        'conversationId': conversationId,
+      });
+    }
+  }
+
+  void addReaction(String messageId, String emoji, String conversationId) {
+    if (_isConnected) {
+      _socket!.emit('addReaction', {
+        'messageId': messageId,
+        'emoji': emoji,
+        'conversationId': conversationId,
+      });
+    }
+  }
+
+  void removeReaction(String messageId, String emoji, String conversationId) {
+    if (_isConnected) {
+      _socket!.emit('removeReaction', {
+        'messageId': messageId,
+        'emoji': emoji,
         'conversationId': conversationId,
       });
     }

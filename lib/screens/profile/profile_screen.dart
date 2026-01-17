@@ -9,6 +9,7 @@ import '../../models/user_model.dart';
 import '../../services/biometric_service.dart';
 import '../../config/theme.dart';
 import '../../config/config.dart';
+import 'blocked_users_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -498,6 +499,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               if (_isBiometricAvailable)
                 const SizedBox(height: 24),
+              
+              // Blocked Users Section
+              Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.secondaryDark,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppTheme.accentColor.withOpacity(0.3),
+                  ),
+                ),
+                child: ListTile(
+                  leading: Icon(
+                    Icons.block,
+                    color: AppTheme.accentColor,
+                  ),
+                  title: const Text('Blocked Users'),
+                  subtitle: const Text('Manage blocked users'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const BlockedUsersScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
+
               // Privacy notice
               Container(
                 padding: const EdgeInsets.all(16),

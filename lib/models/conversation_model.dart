@@ -17,11 +17,15 @@ class ConversationModel extends HiveObject {
   @HiveField(3)
   String? lastMessagePreview;
 
+  @HiveField(4)
+  bool isBlocked;
+
   ConversationModel({
     required this.id,
     required this.otherUser,
     required this.lastMessageAt,
     this.lastMessagePreview,
+    this.isBlocked = false,
   });
 
   factory ConversationModel.fromJson(Map<String, dynamic> json) {
@@ -30,6 +34,7 @@ class ConversationModel extends HiveObject {
       otherUser: UserModel.fromJson(json['otherUser'] as Map<String, dynamic>),
       lastMessageAt: DateTime.parse(json['lastMessageAt'] as String).toLocal(),
       lastMessagePreview: json['lastMessagePreview'] as String?,
+      isBlocked: json['isBlocked'] as bool? ?? false,
     );
   }
 
@@ -39,6 +44,7 @@ class ConversationModel extends HiveObject {
       'otherUser': otherUser.toJson(),
       'lastMessageAt': lastMessageAt.toIso8601String(),
       'lastMessagePreview': lastMessagePreview,
+      'isBlocked': isBlocked,
     };
   }
 }

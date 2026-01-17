@@ -21,8 +21,23 @@ class StorageService {
     } catch (e) {
       // If opening boxes fails (schema mismatch), delete and recreate them
       print('Error opening Hive boxes, clearing corrupted data: $e');
-      await Hive.deleteBoxFromDisk(conversationsBox);
-      await Hive.deleteBoxFromDisk(messagesBox);
+      try {
+        // Close any open boxes first
+        if (Hive.isBoxOpen(conversationsBox)) {
+          await Hive.box<ConversationModel>(conversationsBox).close();
+        }
+        if (Hive.isBoxOpen(messagesBox)) {
+          await Hive.box<MessageModel>(messagesBox).close();
+        }
+        
+        // Delete the corrupted boxes
+        await Hive.deleteBoxFromDisk(conversationsBox);
+        await Hive.deleteBoxFromDisk(messagesBox);
+      } catch (deleteError) {
+        print('Error deleting boxes (this is ok if they don\'t exist): $deleteError');
+      }
+      
+      // Recreate the boxes
       await Hive.openBox<ConversationModel>(conversationsBox);
       await Hive.openBox<MessageModel>(messagesBox);
     }

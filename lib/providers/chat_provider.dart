@@ -38,12 +38,11 @@ class ChatProvider extends ChangeNotifier {
   void _setupSocketListeners() {
     _socketService.onNewMessage = (message) {
       // Check if this is a confirmation for our own pending message
-      final pendingIndex = _messages.indexWhere((m) => 
-        m.senderId == _authService.currentUser?.id && 
-        m.status == 'pending' &&
-        m.content == message.content
-      );
-      
+      final pendingIndex = _messages.indexWhere((m) =>
+          m.senderId == _authService.currentUser?.id &&
+          m.status == 'pending' &&
+          m.content == message.content);
+
       if (pendingIndex != -1) {
         // Update the pending message with the server response
         _messages[pendingIndex] = message;
@@ -51,12 +50,12 @@ class ChatProvider extends ChangeNotifier {
         // Add new message from other user
         _messages.add(message);
       }
-      
+
       notifyListeners();
-      
+
       // Save to storage
       _storageService.saveMessage(message);
-      
+
       // Update conversation's last message time
       _updateConversationLastMessage(message.conversationId, message.content);
     };
@@ -66,15 +65,32 @@ class ChatProvider extends ChangeNotifier {
       _storageService.deleteMessage(messageId);
       notifyListeners();
     };
+
+    _socketService.onReactionAdded = (messageId, reactions) {
+      final index = _messages.indexWhere((m) => m.id == messageId);
+      if (index != -1) {
+        _messages[index].reactions = reactions;
+        notifyListeners();
+        _storageService.saveMessage(_messages[index]);
+      }
+    };
+
+    _socketService.onReactionRemoved = (messageId, reactions) {
+      final index = _messages.indexWhere((m) => m.id == messageId);
+      if (index != -1) {
+        _messages[index].reactions = reactions;
+        notifyListeners();
+        _storageService.saveMessage(_messages[index]);
+      }
+    };
   }
 
   void _updateConversationLastMessage(String conversationId, String content) {
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index != -1) {
       _conversations[index].lastMessageAt = DateTime.now();
-      _conversations[index].lastMessagePreview = content.length > 50
-          ? '${content.substring(0, 50)}...'
-          : content;
+      _conversations[index].lastMessagePreview =
+          content.length > 50 ? '${content.substring(0, 50)}...' : content;
       _conversations.sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
       notifyListeners();
       _storageService.saveConversation(_conversations[index]);
@@ -92,7 +108,7 @@ class ChatProvider extends ChangeNotifier {
 
     // Then fetch from server
     final result = await _chatService.getConversations();
-    
+
     if (result['success']) {
       _conversations = result['conversations'];
       await _storageService.saveConversations(_conversations);
@@ -106,17 +122,17 @@ class ChatProvider extends ChangeNotifier {
 
   Future<ConversationModel?> getOrCreateConversation(String otherUserId) async {
     final result = await _chatService.getOrCreateConversation(otherUserId);
-    
+
     if (result['success']) {
       final conversation = result['conversation'] as ConversationModel;
       await _storageService.saveConversation(conversation);
-      
+
       // Add to list if not already there
       if (!_conversations.any((c) => c.id == conversation.id)) {
         _conversations.insert(0, conversation);
         notifyListeners();
       }
-      
+
       return conversation;
     } else {
       _error = result['error'];
@@ -140,7 +156,7 @@ class ChatProvider extends ChangeNotifier {
 
     // Fetch from server
     final result = await _chatService.getMessages(conversationId);
-    
+
     if (result['success']) {
       _messages = result['messages'];
       await _storageService.saveMessages(_messages);
@@ -164,11 +180,11 @@ class ChatProvider extends ChangeNotifier {
         expiresAt: DateTime.now().add(const Duration(hours: 12)),
         status: 'pending',
       );
-      
+
       // Add to UI immediately
       _messages.add(tempMessage);
       notifyListeners();
-      
+
       // Send to server
       _socketService.sendMessage(_currentConversationId!, content.trim());
     }
@@ -183,11 +199,11 @@ class ChatProvider extends ChangeNotifier {
   void removeExpiredMessages() {
     final initialCount = _messages.length;
     _messages.removeWhere((m) => m.isExpired);
-    
+
     // Only notify if messages were actually removed
     if (_messages.length != initialCount) {
       notifyListeners();
-      
+
       // Also delete from storage
       for (var message in _messages.where((m) => m.isExpired)) {
         _storageService.deleteMessage(message.id);
@@ -197,7 +213,7 @@ class ChatProvider extends ChangeNotifier {
 
   Future<void> deleteConversation(String conversationId) async {
     final result = await _chatService.deleteConversation(conversationId);
-    
+
     if (result['success']) {
       _conversations.removeWhere((c) => c.id == conversationId);
       await _storageService.deleteConversation(conversationId);
@@ -214,18 +230,18 @@ class ChatProvider extends ChangeNotifier {
 
     // Get all conversation IDs
     final conversationIds = _conversations.map((c) => c.id).toList();
-    
+
     // Delete each conversation from backend
     for (final id in conversationIds) {
       await _chatService.deleteConversation(id);
     }
-    
+
     // Clear all from local storage
     await _storageService.clearConversations();
-    
+
     // Clear in-memory list
     _conversations.clear();
-    
+
     _isLoading = false;
     notifyListeners();
   }
@@ -236,6 +252,18 @@ class ChatProvider extends ChangeNotifier {
       _currentConversationId = null;
       _messages = [];
     }
+  }
+
+  Future<void> addReaction(String messageId, String emoji) async {
+    if (_currentConversationId == null) return;
+
+    _socketService.addReaction(messageId, emoji, _currentConversationId!);
+  }
+
+  Future<void> removeReaction(String messageId, String emoji) async {
+    if (_currentConversationId == null) return;
+
+    _socketService.removeReaction(messageId, emoji, _currentConversationId!);
   }
 
   @override

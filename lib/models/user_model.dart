@@ -16,11 +16,15 @@ class UserModel extends HiveObject {
   @HiveField(3)
   String? profilePicture;
 
+  @HiveField(4)
+  List<String>? blockedUsers;
+
   UserModel({
     required this.id,
     required this.displayName,
     this.bio,
     this.profilePicture,
+    this.blockedUsers,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -29,6 +33,9 @@ class UserModel extends HiveObject {
       displayName: json['displayName'] as String,
       bio: json['bio'] as String?,
       profilePicture: json['profilePicture'] as String?,
+      blockedUsers: json['blockedUsers'] != null 
+        ? List<String>.from(json['blockedUsers'] as List)
+        : null,
     );
   }
 
@@ -38,6 +45,7 @@ class UserModel extends HiveObject {
       'displayName': displayName,
       'bio': bio,
       'profilePicture': profilePicture,
+      'blockedUsers': blockedUsers,
     };
   }
 }

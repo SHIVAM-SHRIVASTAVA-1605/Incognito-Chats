@@ -129,4 +129,85 @@ class UserService {
       return {'success': false, 'error': 'Network error: $e'};
     }
   }
+
+  Future<Map<String, dynamic>> blockUser(String userId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${Config.apiUrl}/users/block'),
+        headers: _authService.getAuthHeaders(),
+        body: jsonEncode({'userId': userId}),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': data['message']};
+      } else {
+        return {'success': false, 'error': data['error'] ?? 'Block failed'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> unblockUser(String userId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${Config.apiUrl}/users/unblock'),
+        headers: _authService.getAuthHeaders(),
+        body: jsonEncode({'userId': userId}),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': data['message']};
+      } else {
+        return {'success': false, 'error': data['error'] ?? 'Unblock failed'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> getBlockedUsers() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${Config.apiUrl}/users/blocked'),
+        headers: _authService.getAuthHeaders(),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        final users = (data['blockedUsers'] as List)
+            .map((u) => UserModel.fromJson(u))
+            .toList();
+        return {'success': true, 'users': users};
+      } else {
+        return {'success': false, 'error': data['error'] ?? 'Failed to get blocked users'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> isUserBlocked(String userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${Config.apiUrl}/users/blocked/$userId'),
+        headers: _authService.getAuthHeaders(),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return {'success': true, 'isBlocked': data['isBlocked']};
+      } else {
+        return {'success': false, 'error': data['error'] ?? 'Failed to check block status'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Network error: $e'};
+    }
+  }
 }
